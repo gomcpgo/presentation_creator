@@ -39,24 +39,19 @@ func (s *Screenshotter) TakeScreenshot(htmlDir string, htmlFile string, width, h
 
 	htmlContent := injectCSSReset(string(htmlBytes))
 
-	// Write temp HTML file with CSS reset injected
-	tmpHTMLPath := filepath.Join(htmlDir, "temp_screenshot.html")
+	// We need to serve the presentation root (parent of slides/) so media/ is accessible
+	// The htmlDir might be the slides/ directory, so serve its parent
+	serveDir := htmlDir
+	if filepath.Base(htmlDir) == "slides" {
+		serveDir = filepath.Dir(htmlDir)
+	}
+
+	// Write temp HTML to serveDir so relative paths (media/photo.png) resolve from the root
+	tmpHTMLPath := filepath.Join(serveDir, "temp_screenshot.html")
 	if err := os.WriteFile(tmpHTMLPath, []byte(htmlContent), 0644); err != nil {
 		return fmt.Errorf("failed to write temp HTML file: %w", err)
 	}
 	defer os.Remove(tmpHTMLPath)
-
-	// We need to serve the presentation root (parent of slides/) so media/ is accessible
-	// The htmlDir might be the slides/ directory, so serve its parent
-	serveDir := htmlDir
-	serveFile := "temp_screenshot.html"
-
-	// If htmlDir is a slides/ subdirectory, serve the parent so media/ paths resolve
-	parentDir := filepath.Dir(htmlDir)
-	if filepath.Base(htmlDir) == "slides" {
-		serveDir = parentDir
-		serveFile = "slides/temp_screenshot.html"
-	}
 
 	// Start a temporary local HTTP server
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
@@ -91,7 +86,7 @@ func (s *Screenshotter) TakeScreenshot(htmlDir string, htmlFile string, width, h
 	}
 	defer browser.MustClose()
 
-	pageURL := fmt.Sprintf("http://127.0.0.1:%d/%s", port, serveFile)
+	pageURL := fmt.Sprintf("http://127.0.0.1:%d/temp_screenshot.html", port)
 	page, err := browser.Page(proto.TargetCreateTarget{URL: pageURL})
 	if err != nil {
 		return fmt.Errorf("failed to create page: %w", err)

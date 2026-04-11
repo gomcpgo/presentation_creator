@@ -81,7 +81,17 @@ func (h *Handler) handleCreatePresentation(ctx context.Context, args map[string]
 	}
 
 	slidesRaw, ok := args["slides"].([]interface{})
-	if !ok || len(slidesRaw) == 0 {
+	if !ok {
+		// LLMs sometimes send the slides array as a JSON string instead of an actual array
+		if slidesStr, isStr := args["slides"].(string); isStr && slidesStr != "" {
+			if err := json.Unmarshal([]byte(slidesStr), &slidesRaw); err != nil {
+				return nil, fmt.Errorf("slides must be an array of HTML strings, failed to parse: %v", err)
+			}
+		} else {
+			return nil, fmt.Errorf("slides is required and must be a non-empty array")
+		}
+	}
+	if len(slidesRaw) == 0 {
 		return nil, fmt.Errorf("slides is required and must be a non-empty array")
 	}
 
