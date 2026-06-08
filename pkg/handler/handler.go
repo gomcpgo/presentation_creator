@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -67,6 +68,8 @@ func (h *Handler) CallTool(ctx context.Context, req *protocol.CallToolRequest) (
 		return h.handleListPresentations(ctx, req.Arguments)
 	case "add_media":
 		return h.handleAddMedia(ctx, req.Arguments)
+	case "preview_slide":
+		return h.handlePreviewSlide(ctx, req.Arguments)
 	case "export_presentation":
 		return h.handleExportPresentation(ctx, req.Arguments)
 	default:
@@ -85,7 +88,7 @@ func (h *Handler) handleCreatePresentation(ctx context.Context, args map[string]
 		// LLMs sometimes send the slides array as a JSON string instead of an actual array
 		if slidesStr, isStr := args["slides"].(string); isStr && slidesStr != "" {
 			if err := json.Unmarshal([]byte(slidesStr), &slidesRaw); err != nil {
-				return nil, fmt.Errorf("slides must be an array of HTML strings, failed to parse: %v", err)
+				return nil, fmt.Errorf("slides was passed as a JSON-encoded string and failed to parse (likely an unescaped quote in the HTML): %v. Pass slides as a native JSON array of strings instead, or add slides one at a time with add_slide", err)
 			}
 		} else {
 			return nil, fmt.Errorf("slides is required and must be a non-empty array")
@@ -327,6 +330,52 @@ func (h *Handler) handleAddMedia(ctx context.Context, args map[string]interface{
 	}
 
 	return h.successResponse(result), nil
+}
+
+func (h *Handler) handlePreviewSlide(ctx context.Context, args map[string]interface{}) (*protocol.CallToolResponse, error) {
+	presID, ok := args["presentation_id"].(string)
+	if !ok || presID == "" {
+		return nil, fmt.Errorf("presentation_id is required")
+	}
+
+	slideNumFloat, ok := args["slide_number"].(float64)
+	if !ok {
+		return nil, fmt.Errorf("slide_number is required and must be an integer")
+	}
+	slideNumber := int(slideNumFloat)
+
+	p, _, err := h.presSvc.GetPresentation(presID)
+	if err != nil {
+		return h.errorResponse(fmt.Sprintf("Failed to get presentation: %v", err)), nil
+	}
+	if slideNumber < 1 || slideNumber > p.SlideCount {
+		return h.errorResponse(fmt.Sprintf("slide_number %d out of range (presentation has %d slides)", slideNumber, p.SlideCount)), nil
+	}
+
+	presPath := h.presSvc.GetPresentationPath(presID)
+	slidesDir := h.presSvc.GetSlidesDir(presID)
+	imgPath := fmt.Sprintf("%s/preview_%d.png", presPath, slideNumber)
+	slideFile := fmt.Sprintf("%d.html", slideNumber)
+
+	if err := h.screenshotSvc.TakeScreenshot(slidesDir, slideFile, presentation.SlideWidth, presentation.SlideHeight, imgPath); err != nil {
+		return h.errorResponse(fmt.Sprintf("Failed to render slide %d: %v", slideNumber, err)), nil
+	}
+	defer os.Remove(imgPath)
+
+	imgBytes, err := os.ReadFile(imgPath)
+	if err != nil {
+		return h.errorResponse(fmt.Sprintf("Failed to read rendered slide: %v", err)), nil
+	}
+
+	return &protocol.CallToolResponse{
+		Content: []protocol.ToolContent{
+			{
+				Type:     "image",
+				Data:     base64.StdEncoding.EncodeToString(imgBytes),
+				MimeType: "image/png",
+			},
+		},
+	}, nil
 }
 
 func (h *Handler) handleExportPresentation(ctx context.Context, args map[string]interface{}) (*protocol.CallToolResponse, error) {

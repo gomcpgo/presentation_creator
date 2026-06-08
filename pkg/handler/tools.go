@@ -136,6 +136,24 @@ func (h *Handler) GetTools() []protocol.Tool {
 			}`),
 		},
 		{
+			Name:        "preview_slide",
+			Description: "Render a single slide to a PNG image and return it for visual inspection. Use this to verify a slide's layout (overflow, alignment, fonts, grid) before exporting the full presentation.",
+			InputSchema: json.RawMessage(`{
+				"type": "object",
+				"properties": {
+					"presentation_id": {
+						"type": "string",
+						"description": "The unique presentation ID"
+					},
+					"slide_number": {
+						"type": "integer",
+						"description": "1-based slide number to preview"
+					}
+				},
+				"required": ["presentation_id", "slide_number"]
+			}`),
+		},
+		{
 			Name:        "export_presentation",
 			Description: "Export a presentation to PPTX or PDF. Each slide is rendered as a high-quality image via headless Chrome and assembled into the output format.",
 			InputSchema: json.RawMessage(`{
