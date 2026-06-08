@@ -135,24 +135,10 @@ func (h *Handler) GetTools() []protocol.Tool {
 				"required": ["presentation_id", "source_path"]
 			}`),
 		},
-		{
-			Name:        "preview_slide",
-			Description: "Render a single slide to a PNG image and return it for visual inspection. Use this to verify a slide's layout (overflow, alignment, fonts, grid) before exporting the full presentation.",
-			InputSchema: json.RawMessage(`{
-				"type": "object",
-				"properties": {
-					"presentation_id": {
-						"type": "string",
-						"description": "The unique presentation ID"
-					},
-					"slide_number": {
-						"type": "integer",
-						"description": "1-based slide number to preview"
-					}
-				},
-				"required": ["presentation_id", "slide_number"]
-			}`),
-		},
+		// preview_slide is intentionally not advertised here. The handler and
+		// dispatch are retained, but returning a base64 image over stdio can
+		// deadlock the MCP transport on an oversized stderr line — see
+		// docs/issues/mcp-stdio-stderr-deadlock.md. Revisit once that is fixed.
 		{
 			Name:        "export_presentation",
 			Description: "Export a presentation to PPTX or PDF. Each slide is rendered as a high-quality image via headless Chrome and assembled into the output format.",
