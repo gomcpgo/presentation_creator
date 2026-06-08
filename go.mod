@@ -4,11 +4,9 @@ go 1.23
 
 require (
 	github.com/go-rod/rod v0.116.2
-	github.com/gomcpgo/mcp v1.0.2
+	github.com/gomcpgo/mcp v1.0.3
 	github.com/gosimple/slug v1.14.0
 )
-
-replace github.com/gomcpgo/mcp => ../mcp
 
 require (
 	github.com/gosimple/unidecode v1.0.1 // indirect
