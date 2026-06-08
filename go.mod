@@ -8,6 +8,8 @@ require (
 	github.com/gosimple/slug v1.14.0
 )
 
+replace github.com/gomcpgo/mcp => ../mcp
+
 require (
 	github.com/gosimple/unidecode v1.0.1 // indirect
 	github.com/ysmood/fetchup v0.2.3 // indirect
